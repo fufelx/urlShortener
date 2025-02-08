@@ -5,6 +5,7 @@ import (
 	"example.com/m/pkg/pgsql"
 	"example.com/m/pkg/urlshortener"
 	"net/http"
+	"net/url"
 )
 
 //go:generate mockgen -source=api.go -destination=/Users/macbook/Desktop/urlShortener/mocks/mock_pgsql.go
@@ -33,6 +34,12 @@ func AddUrl(w http.ResponseWriter, r *http.Request) {
 	err := json.NewDecoder(r.Body).Decode(&creds)
 	if err != nil || creds.Url == "" {
 		http.Error(w, "неправильный JSON", http.StatusBadRequest)
+		return
+	}
+
+	_, err = url.ParseRequestURI(creds.Url)
+	if err != nil {
+		http.Error(w, "неправильный формат ссылки", http.StatusBadRequest)
 		return
 	}
 
