@@ -8,18 +8,11 @@ import (
 	"net/url"
 )
 
-//go:generate mockgen -source=api.go -destination=/Users/macbook/Desktop/urlShortener/mocks/mock_pgsql.go
-
 var (
 	InMemory      = false
 	UrlToShorturl = make(map[string]string) // мапа для хранения оригинальной ссылки и её сокращения
 	ShorturlToUrl = make(map[string]string) // мапа для хранения сокращения и её оригинальной ссылки
 )
-
-type DBInterface interface {
-	AddUrl(info pgsql.UrlInfo) (string, error)
-	GetUrlByShotrurl(shorturl string) (pgsql.UrlInfo, error)
-}
 
 func AddUrl(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -43,18 +36,22 @@ func AddUrl(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	type answer struct {
+		Url string `json:"shorturl"`
+	}
+
 	// Если ссылка уже существует, возвращаем её
 	if shorturl, exist := UrlToShorturl[creds.Url]; exist {
-		res := pgsql.UrlInfo{Url: creds.Url, ShortUrl: shorturl}
+		ans := answer{Url: shorturl}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(res.ShortUrl)
+		json.NewEncoder(w).Encode(ans)
 		return
 	}
 
 createShortUrlAgain:
 	shorturl := urlshortener.MakeUrlShort()
 	res := pgsql.UrlInfo{Url: creds.Url, ShortUrl: shorturl}
-
+	ans := answer{Url: shorturl}
 	if InMemory {
 		if _, exist := ShorturlToUrl[shorturl]; exist {
 			// Если сгенерированная короткая ссылка уже существует, генерируем новую
@@ -68,11 +65,11 @@ createShortUrlAgain:
 			// Если сгенерированная короткая ссылка уже существует, генерируем новую
 			goto createShortUrlAgain
 		}
-		res.ShortUrl = shorturltmp
+		ans.Url = shorturltmp
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(res.ShortUrl)
+	json.NewEncoder(w).Encode(ans)
 }
 
 func GetUrl(w http.ResponseWriter, r *http.Request) {
@@ -87,10 +84,13 @@ func GetUrl(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var res pgsql.UrlInfo
+	type answer struct {
+		Url string `json:"url"`
+	}
+	ans := answer{}
 	if InMemory {
-		res.Url = ShorturlToUrl[shorturl]
-		if res.Url == "" {
+		ans.Url = ShorturlToUrl[shorturl]
+		if ans.Url == "" {
 			http.Error(w, "оригинал ссылки отсутствует", http.StatusBadRequest)
 			return
 		}
@@ -100,9 +100,9 @@ func GetUrl(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "оригинал ссылки отсутствует", http.StatusBadRequest)
 			return
 		}
-		res = restmp
+		ans.Url = restmp.Url
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(res.Url)
+	json.NewEncoder(w).Encode(ans)
 }

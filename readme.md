@@ -19,4 +19,4 @@ POST http://localhost:3030/api/addurl
 ```
 
 
-GET http://localhost:3030/api/geturl?shorturl=shorturl
+GET http://localhost:3030/api/geturl?shorturl=http://localhost:3030/hHh33JwTCL
