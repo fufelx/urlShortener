@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"github.com/jackc/pgx/v4/pgxpool"
-	"github.com/joho/godotenv"
-	"log"
 	"os"
 )
 
 //go:generate mockgen -source=pgsql.go -destination=mocks/mock.go
+
+var (
+	Db, Errdb = New()
+)
 
 // UrlInfo - информация о URL.
 type UrlInfo struct {
@@ -24,10 +26,6 @@ type Store struct {
 
 // New функция для подключения к БД.
 func New() (*Store, error) {
-	err := godotenv.Load()
-	if err != nil {
-		log.Println("файл .env не найден, используются переменные окружения")
-	}
 	dbUser := os.Getenv("DB_USER")
 	dbPassword := os.Getenv("DB_PASSWORD")
 	dbHost := os.Getenv("DB_HOST")

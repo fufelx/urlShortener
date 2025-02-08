@@ -2,6 +2,7 @@ package redirect
 
 import (
 	"example.com/m/pkg/api"
+	"example.com/m/pkg/pgsql"
 	"net/http"
 )
 
@@ -24,7 +25,7 @@ func RedirectUrl(w http.ResponseWriter, r *http.Request) {
 		originalUrl = api.ShorturlToUrl[shorturl]
 	} else {
 		// Проверяем в базе данных
-		res, err := api.Db.GetUrlByShotrurl(shorturl)
+		res, err := pgsql.Db.GetUrlByShotrurl(shorturl)
 		if err != nil {
 			http.Error(w, "shorturl не существует", http.StatusNotFound)
 			return

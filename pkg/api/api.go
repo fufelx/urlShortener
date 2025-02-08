@@ -10,7 +10,6 @@ import (
 //go:generate mockgen -source=api.go -destination=/Users/macbook/Desktop/urlShortener/mocks/mock_pgsql.go
 
 var (
-	Db, Errdb     = pgsql.New()
 	InMemory      = false
 	UrlToShorturl = make(map[string]string) // мапа для хранения оригинальной ссылки и её сокращения
 	ShorturlToUrl = make(map[string]string) // мапа для хранения сокращения и её оригинальной ссылки
@@ -57,7 +56,7 @@ createShortUrlAgain:
 		UrlToShorturl[creds.Url] = shorturl
 		ShorturlToUrl[shorturl] = creds.Url
 	} else {
-		shorturltmp, err := Db.AddUrl(res)
+		shorturltmp, err := pgsql.Db.AddUrl(res)
 		if err != nil {
 			// Если сгенерированная короткая ссылка уже существует, генерируем новую
 			goto createShortUrlAgain
@@ -89,7 +88,7 @@ func GetUrl(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else {
-		restmp, err := Db.GetUrlByShotrurl(shorturl)
+		restmp, err := pgsql.Db.GetUrlByShotrurl(shorturl)
 		if err != nil {
 			http.Error(w, "оригинал ссылки отсутствует", http.StatusBadRequest)
 			return

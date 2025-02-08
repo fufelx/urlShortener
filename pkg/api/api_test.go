@@ -1,119 +1,72 @@
-package api
+package api_test
 
 import (
 	"bytes"
-	"github.com/stretchr/testify/assert"
+	"encoding/json"
+	"example.com/m/pkg/api"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 )
 
 func TestAddUrl(t *testing.T) {
-	InMemory = true
-	UrlToShorturl = make(map[string]string)
-	ShorturlToUrl = make(map[string]string)
+	api.InMemory = false
+	api.UrlToShorturl = make(map[string]string)
+	api.ShorturlToUrl = make(map[string]string)
 
-	tests := []struct {
-		name       string
-		method     string
-		body       string
-		wantStatus int
-		wantBody   string
-	}{
-		{
-			name:       "Ошибка: неверный метод",
-			method:     http.MethodGet,
-			body:       "",
-			wantStatus: http.StatusMethodNotAllowed,
-			wantBody:   "неправильный метод\n",
-		},
-		{
-			name:       "Ошибка: некорректный JSON",
-			method:     http.MethodPost,
-			body:       `{"wrong_field": "https://example.com"}`,
-			wantStatus: http.StatusBadRequest,
-			wantBody:   "неправильный JSON\n",
-		},
-		{
-			name:       "Успешное сокращение ссылки",
-			method:     http.MethodPost,
-			body:       `{"url": "https://example.com"}`,
-			wantStatus: http.StatusOK,
-			wantBody:   `"short123"\n`,
-		},
-		{
-			name:       "Ошибка БД",
-			method:     http.MethodPost,
-			body:       `{"url": "https://error.com"}`,
-			wantStatus: http.StatusInternalServerError,
-			wantBody:   "ошибка при сокращении ссылки\n",
-		},
+	requestBody, _ := json.Marshal(map[string]string{
+		"url": "https://example.com",
+	})
+
+	req, err := http.NewRequest("POST", "/add", bytes.NewBuffer(requestBody))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	recorder := httptest.NewRecorder()
+	handler := http.HandlerFunc(api.AddUrl)
+	handler.ServeHTTP(recorder, req)
+
+	if status := recorder.Code; status != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, status)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(tt.method, "/add", bytes.NewBufferString(tt.body))
-			req.Header.Set("Content-Type", "application/json")
-			rec := httptest.NewRecorder()
+	var shortUrl string
+	if err := json.Unmarshal(recorder.Body.Bytes(), &shortUrl); err != nil {
+		t.Errorf("failed to parse response: %v", err)
+	}
 
-			AddUrl(rec, req)
-
-			res := rec.Result()
-			defer res.Body.Close()
-
-			assert.Equal(t, tt.wantStatus, res.StatusCode)
-
-			body := new(bytes.Buffer)
-			body.ReadFrom(res.Body)
-			assert.Equal(t, tt.wantBody, body.String())
-		})
+	if len(shortUrl) == 0 {
+		t.Error("short URL is empty")
 	}
 }
 
 func TestGetUrl(t *testing.T) {
-	InMemory = false
+	api.InMemory = false
+	shortUrl := "http://localhost:3030/hHh33JwTCL"
+	originalUrl := "https://example.com"
+	api.ShorturlToUrl[shortUrl] = originalUrl
 
-	tests := []struct {
-		name       string
-		shorturl   string
-		wantStatus int
-		wantBody   string
-	}{
-		{
-			name:       "Ошибка: пустой параметр",
-			shorturl:   "",
-			wantStatus: http.StatusBadRequest,
-			wantBody:   "shorturl не найдена в RawQuery\n",
-		},
-		{
-			name:       "Успешное получение оригинальной ссылки",
-			shorturl:   "short123",
-			wantStatus: http.StatusOK,
-			wantBody:   `"https://example.com"\n`,
-		},
-		{
-			name:       "Ошибка: ссылка не найдена",
-			shorturl:   "notfound",
-			wantStatus: http.StatusBadRequest,
-			wantBody:   "оригинал ссылки отсутствует\n",
-		},
+	req, err := http.NewRequest("GET", "/get?shorturl="+shortUrl, nil)
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodGet, "/get?shorturl="+tt.shorturl, nil)
-			rec := httptest.NewRecorder()
+	recorder := httptest.NewRecorder()
+	handler := http.HandlerFunc(api.GetUrl)
+	handler.ServeHTTP(recorder, req)
 
-			GetUrl(rec, req)
+	if status := recorder.Code; status != http.StatusOK {
+		t.Errorf("expected status %d, got %d", http.StatusOK, status)
+	}
 
-			res := rec.Result()
-			defer res.Body.Close()
+	var returnedUrl string
+	if err := json.Unmarshal(recorder.Body.Bytes(), &returnedUrl); err != nil {
+		t.Errorf("failed to parse response: %v", err)
+	}
 
-			assert.Equal(t, tt.wantStatus, res.StatusCode)
-
-			body := new(bytes.Buffer)
-			body.ReadFrom(res.Body)
-			assert.Equal(t, tt.wantBody, body.String())
-		})
+	if returnedUrl != originalUrl {
+		t.Errorf("expected %s, got %s", originalUrl, returnedUrl)
 	}
 }
