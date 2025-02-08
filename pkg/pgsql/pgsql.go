@@ -9,6 +9,8 @@ import (
 	"os"
 )
 
+//go:generate mockgen -source=pgsql.go -destination=mocks/mock.go
+
 // UrlInfo - информация о URL.
 type UrlInfo struct {
 	Url      string `json:"url"`
@@ -26,7 +28,6 @@ func New() (*Store, error) {
 	if err != nil {
 		log.Println("файл .env не найден, используются переменные окружения")
 	}
-
 	dbUser := os.Getenv("DB_USER")
 	dbPassword := os.Getenv("DB_PASSWORD")
 	dbHost := os.Getenv("DB_HOST")

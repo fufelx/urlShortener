@@ -7,12 +7,19 @@ import (
 	"net/http"
 )
 
+//go:generate mockgen -source=api.go -destination=/Users/macbook/Desktop/urlShortener/mocks/mock_pgsql.go
+
 var (
-	db, Errdb     = pgsql.New()
+	Db, Errdb     = pgsql.New()
 	InMemory      = false
 	UrlToShorturl = make(map[string]string) // мапа для хранения оригинальной ссылки и её сокращения
 	ShorturlToUrl = make(map[string]string) // мапа для хранения сокращения и её оригинальной ссылки
 )
+
+type DBInterface interface {
+	AddUrl(info pgsql.UrlInfo) (string, error)
+	GetUrlByShotrurl(shorturl string) (pgsql.UrlInfo, error)
+}
 
 func AddUrl(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -30,6 +37,7 @@ func AddUrl(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Если ссылка уже существует, возвращаем её
 	if shorturl, exist := UrlToShorturl[creds.Url]; exist {
 		res := pgsql.UrlInfo{Url: creds.Url, ShortUrl: shorturl}
 		w.Header().Set("Content-Type", "application/json")
@@ -38,23 +46,20 @@ func AddUrl(w http.ResponseWriter, r *http.Request) {
 	}
 
 createShortUrlAgain:
-	shorturl, err := urlshortener.MakeUrlShort()
-	if err != nil {
-		http.Error(w, "ошибка при сокращении ссылки", http.StatusInternalServerError)
-		return
-	}
-
+	shorturl := urlshortener.MakeUrlShort()
 	res := pgsql.UrlInfo{Url: creds.Url, ShortUrl: shorturl}
 
 	if InMemory {
 		if _, exist := ShorturlToUrl[shorturl]; exist {
+			// Если сгенерированная короткая ссылка уже существует, генерируем новую
 			goto createShortUrlAgain
 		}
 		UrlToShorturl[creds.Url] = shorturl
 		ShorturlToUrl[shorturl] = creds.Url
 	} else {
-		shorturltmp, err := db.AddUrl(res)
+		shorturltmp, err := Db.AddUrl(res)
 		if err != nil {
+			// Если сгенерированная короткая ссылка уже существует, генерируем новую
 			goto createShortUrlAgain
 		}
 		res.ShortUrl = shorturltmp
@@ -77,7 +82,6 @@ func GetUrl(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var res pgsql.UrlInfo
-
 	if InMemory {
 		res.Url = ShorturlToUrl[shorturl]
 		if res.Url == "" {
@@ -85,7 +89,7 @@ func GetUrl(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else {
-		restmp, err := db.GetUrlByShotrurl(shorturl)
+		restmp, err := Db.GetUrlByShotrurl(shorturl)
 		if err != nil {
 			http.Error(w, "оригинал ссылки отсутствует", http.StatusBadRequest)
 			return
