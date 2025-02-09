@@ -40,19 +40,18 @@ func AddUrl(w http.ResponseWriter, r *http.Request) {
 		Url string `json:"shorturl"`
 	}
 
-	// Если ссылка уже существует, возвращаем её
-	if shorturl, exist := UrlToShorturl[creds.Url]; exist {
-		ans := answer{Url: shorturl}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(ans)
-		return
-	}
-
 createShortUrlAgain:
 	shorturl := urlshortener.MakeUrlShort()
 	res := pgsql.UrlInfo{Url: creds.Url, ShortUrl: shorturl}
 	ans := answer{Url: shorturl}
 	if InMemory {
+		// Если ссылка уже существует, возвращаем её
+		if shorturlexist, exist := UrlToShorturl[creds.Url]; exist {
+			ans := answer{Url: shorturlexist}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(ans)
+			return
+		}
 		if _, exist := ShorturlToUrl[shorturl]; exist {
 			// Если сгенерированная короткая ссылка уже существует, генерируем новую
 			goto createShortUrlAgain

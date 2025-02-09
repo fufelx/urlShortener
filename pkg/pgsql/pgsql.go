@@ -7,8 +7,6 @@ import (
 	"os"
 )
 
-//go:generate mockgen -source=pgsql.go -destination=mocks/mock.go
-
 var (
 	Db, Errdb = New()
 )
