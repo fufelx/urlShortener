@@ -2,7 +2,6 @@ package main
 
 import (
 	"example.com/m/pkg/api"
-	"example.com/m/pkg/pgsql"
 	"example.com/m/pkg/redirect"
 	"log"
 	"net/http"
@@ -15,15 +14,18 @@ func main() {
 	if inMemory == "in-memory" {
 		api.InMemory = true
 	} else {
-		if pgsql.Errdb != nil {
-			log.Fatal(pgsql.Errdb)
+		if api.Errdb != nil {
+			log.Fatal(api.Errdb)
 		}
 	}
 
+	// мок для бд
+	handler := api.DB{DBF: api.DBfunction(api.Db)}
+
 	apiMux := http.NewServeMux()
 	// Добавляем маршруты для API
-	apiMux.HandleFunc("/api/addurl", api.AddUrl)
-	apiMux.HandleFunc("/api/geturl", api.GetUrl)
+	apiMux.HandleFunc("/api/addurl", handler.AddUrl)
+	apiMux.HandleFunc("/api/geturl", handler.GetUrl)
 	apiMux.HandleFunc("/", redirect.RedirectUrl)
 
 	if err := http.ListenAndServe(":3030", apiMux); err != nil {

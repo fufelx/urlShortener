@@ -9,12 +9,24 @@ import (
 )
 
 var (
+	Db, Errdb     = pgsql.New()
 	InMemory      = false
 	UrlToShorturl = make(map[string]string) // мапа для хранения оригинальной ссылки и её сокращения
 	ShorturlToUrl = make(map[string]string) // мапа для хранения сокращения и её оригинальной ссылки
 )
 
-func AddUrl(w http.ResponseWriter, r *http.Request) {
+// мок для бд
+type DBfunction interface {
+	AddUrl(info pgsql.UrlInfo) (string, error)
+	GetUrlByShotrurl(shorturl string) (pgsql.UrlInfo, error)
+}
+
+// мок для бд
+type DB struct {
+	DBF DBfunction
+}
+
+func (db *DB) AddUrl(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "неправильный метод", http.StatusMethodNotAllowed)
 		return
@@ -59,7 +71,7 @@ createShortUrlAgain:
 		UrlToShorturl[creds.Url] = shorturl
 		ShorturlToUrl[shorturl] = creds.Url
 	} else {
-		shorturltmp, err := pgsql.Db.AddUrl(res)
+		shorturltmp, err := db.DBF.AddUrl(res)
 		if err != nil {
 			// Если сгенерированная короткая ссылка уже существует, генерируем новую
 			goto createShortUrlAgain
@@ -71,7 +83,7 @@ createShortUrlAgain:
 	json.NewEncoder(w).Encode(ans)
 }
 
-func GetUrl(w http.ResponseWriter, r *http.Request) {
+func (db *DB) GetUrl(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "неправильный метод", http.StatusMethodNotAllowed)
 		return
@@ -94,7 +106,7 @@ func GetUrl(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else {
-		restmp, err := pgsql.Db.GetUrlByShotrurl(shorturl)
+		restmp, err := db.DBF.GetUrlByShotrurl(shorturl)
 		if err != nil {
 			http.Error(w, "оригинал ссылки отсутствует", http.StatusBadRequest)
 			return

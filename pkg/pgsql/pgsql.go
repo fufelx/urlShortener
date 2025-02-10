@@ -7,10 +7,6 @@ import (
 	"os"
 )
 
-var (
-	Db, Errdb = New()
-)
-
 // UrlInfo - информация о URL.
 type UrlInfo struct {
 	Url      string `json:"url"`
