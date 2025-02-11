@@ -1,6 +1,7 @@
 package urlshortener
 
 import (
+	"example.com/m/internal/storage"
 	"math/rand"
 	"time"
 )
@@ -14,6 +15,13 @@ func MakeUrlShort() string {
 	for i := range short {
 		short[i] = chars[rand.Intn(len(chars))]
 	}
-	res := "http://localhost:3030/" + string(short)
-	return res
+
+	if storage.InMemory {
+		if _, exist := storage.ShortToOriginalmap[string(short)]; exist {
+			// Если сгенерированная короткая ссылка уже существует, генерируем новую
+			return MakeUrlShort()
+		}
+	}
+
+	return string(short)
 }

@@ -1,4 +1,4 @@
-package pgsql
+package storage
 
 import (
 	"context"
@@ -6,17 +6,6 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"os"
 )
-
-// UrlInfo - информация о URL.
-type UrlInfo struct {
-	Url      string `json:"url"`
-	ShortUrl string `json:"shorturl"`
-}
-
-type Store struct {
-	ctx context.Context
-	db  pgxpool.Pool
-}
 
 // New функция для подключения к БД.
 func New() (*Store, error) {
@@ -36,43 +25,34 @@ func New() (*Store, error) {
 }
 
 // AddUrl добавляет URL и ShortURL в БД.
-func (s *Store) AddUrl(info UrlInfo) (string, error) {
+func (s *Store) AddUrl(originallink, shortlink string) (string, error) {
 	var existingShort string
-	err := s.db.QueryRow(s.ctx, "SELECT shorturl FROM urls WHERE url = $1", info.Url).Scan(&existingShort)
+	err := s.db.QueryRow(s.ctx, "SELECT shorturl FROM urls WHERE url = $1", originallink).Scan(&existingShort)
 	if err == nil {
 		return existingShort, nil // Если ссылка уже существует, возвращаем её
 	}
 
-	tx, err := s.db.Begin(s.ctx)
+	_, err = s.db.Exec(s.ctx, `INSERT INTO urls(url, shorturl) VALUES ($1,$2)`, originallink, shortlink)
 	if err != nil {
 		return "", err
 	}
-	defer tx.Rollback(s.ctx)
 
-	_, err = tx.Exec(s.ctx, `INSERT INTO urls(url, shorturl) VALUES ($1,$2)`, info.Url, info.ShortUrl)
-	if err != nil {
-		return "", err
-	} else {
-		tx.Commit(s.ctx)
-		return info.ShortUrl, nil
-	}
+	return shortlink, nil
 }
 
 // GetUrlByShotrurl возвращает URL по ShortURL.
-func (s *Store) GetUrlByShotrurl(shorturl string) (UrlInfo, error) {
-	rows, err := s.db.Query(s.ctx, `SELECT url, shorturl FROM urls WHERE shorturl = $1`, shorturl)
+func (s *Store) GetUrlByShotrurl(shorturl string) (string, error) {
+	rows, err := s.db.Query(s.ctx, `SELECT url FROM urls WHERE shorturl = $1`, shorturl)
 	if err != nil {
-		return UrlInfo{}, err
+		return "", err
 	} else {
-		var info UrlInfo
+		var link string
 		for rows.Next() {
-			var t UrlInfo
-			rows.Scan(&t.Url, &t.ShortUrl)
-			info = UrlInfo{t.Url, t.ShortUrl}
+			rows.Scan(&link)
 			if rows.Err() != nil {
-				return UrlInfo{}, err
+				return "", err
 			}
 		}
-		return info, nil
+		return link, nil
 	}
 }

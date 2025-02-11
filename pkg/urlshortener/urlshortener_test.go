@@ -1,19 +1,23 @@
 package urlshortener
 
-import "testing"
+import (
+	"example.com/m/internal/storage"
+	"strconv"
+	"testing"
+)
 
+// Проверяем, что на 10000(можно изменить) сокращенных ссылок не создается дубликат.
 func TestMakeUrlShort(t *testing.T) {
-	tests := []struct {
-		name string
-		want string
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := MakeUrlShort(); got != tt.want {
-				t.Errorf("MakeUrlShort() = %v, want %v", got, tt.want)
+	storage.InMemory = true
+	shortmap := make(map[string]int)
+	for i := 0; i < 10000; i++ {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			short := MakeUrlShort()
+			if _, exist := shortmap[short]; exist {
+				t.Errorf("Создан дубликат в %v и %v тестах", i, shortmap[short])
+				return
 			}
+			shortmap[short] = i
 		})
 	}
 }
